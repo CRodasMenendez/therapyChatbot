@@ -38,7 +38,7 @@ from scipy.special import softmax
 from transformers import pipeline
 
 
-#install_NLTK_resources()
+install_NLTK_resources()
 
 from datasets import load_dataset
 from torch.utils.data import DataLoader
