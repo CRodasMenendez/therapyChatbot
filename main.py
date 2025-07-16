@@ -1,140 +1,109 @@
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from stt import transcribe
+import torch
+import torch.nn.functional as F
 
+# Load tokenizer and model from local directory
+model_path = "./my-finetuned-model" 
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+model = AutoModelForSequenceClassification.from_pretrained(model_path)
 
-plt.style.use('ggplot')
+# Define the emotion labels model was trained on 
+emotions = [
+    'afraid', 'angry', 'annoyed', 'anticipating', 'anxious', 'apprehensive', 
+    'ashamed', 'caring', 'confident', 'content', 'devastated', 'disappointed', 
+    'disgusted', 'embarrassed', 'excited', 'faithful', 'furious', 'grateful', 
+    'guilty', 'hopeful', 'impressed', 'jealous', 'joyful', 'lonely', 'nostalgic', 
+    'prepared', 'proud', 'sad', 'sentimental', 'surprised', 'terrified', 'trusting'
+]
 
-import nltk
-
-
-#function to check if NLTK resources are installed and if not, it installs them
-def install_NLTK_resources():
-    resources = {
-        'averaged_perceptron_tagger_eng': 'taggers/averaged_perceptron_tagger_eng',
-        'punkt': 'tokenizers/punkt',
-        'stopwords': 'corpora/stopwords',
-        'wordnet': 'corpora/wordnet',
-        'punkt_tab': 'tokenizers/punkt_tab',
-        'maxent_ne_chunker_tab': 'chunkers/maxent_ne_chunker_tab',
-        'words': 'corpora/words',
-        'vader_lexicon': 'sentiment/vader_lexicon'
-    }
-
-    for name, path in resources.items():
-        try:
-            nltk.data.find(path)
-            print(f"{name} already available.")
-        except LookupError:
-            print(f"Downloading {name}...")
-            nltk.download(name)
-
-from nltk.sentiment import SentimentIntensityAnalyzer
-from tqdm import tqdm
-from transformers import AutoTokenizer
-from transformers import AutoModelForSequenceClassification
-from scipy.special import softmax
-from transformers import pipeline
-
-
-install_NLTK_resources()
-
-from datasets import load_dataset
-from torch.utils.data import DataLoader
-
-# --------------------------- Process Empathetic Dialogues Dataset --------------------------
-ds_ed = load_dataset("Estwld/empathetic_dialogues_llm")
-#print(ds_ed)
-
-#tokenizer object
-roberta_tokenizer = AutoTokenizer.from_pretrained("roberta-base")
-
-#pre-process the emotions field
-emotions = sorted(set(ds_ed['train']['emotion']))
-emotion_to_id = {e: i for i,e in enumerate(emotions)} #gives each emotion a numeric ID for training and tokenization
-
-
-#function to tokenize data
-def roberta_tokenization(batch):
-    # batch argument - Dictionary containing lists of data from the dataset 
-    # batch['situation'] - List of situation text strings
-    # batch['emotion'] - List of emotion labels (strings)
+def analyze_spoken_text():
+    print("Starting emotional analysis of speech...")
     
-    # Returns Dictionary with tokenized data ready for model training:
+    # Get transcribed text from the stt module 
+    transcribed_text = transcribe()
     
-
-    tokens = roberta_tokenizer(batch['situation'], padding='max_length',truncation=True, max_length = 512) 
-    # batch['situation'] is a list like: ["I feel sad today", "I'm happy", ...]
+    # Check if transcription was successful
+    if transcribed_text and transcribed_text.strip():
+        print(f"Input: '{transcribed_text}'")
+        
+        # Tokenize the text for the model (same way you did in training)
+        inputs = tokenizer(transcribed_text, return_tensors='pt', truncation=True,padding=True, max_length=512)
+        
+        # Run the text through the model
+        with torch.no_grad():  # Disable gradient calculation for inference (I don't need weights since im no longer training)
+            outputs = model(**inputs)
+        
+        # Extract the raw logits (model's raw predictions)
+        logits = outputs.logits
+        
+        # Convert logits to probabilities 
+        probabilities = F.softmax(logits, dim=-1)
+        
+        # Get the predicted emotion (highest probability)
+        predicted_emotion_id = torch.argmax(probabilities, dim=-1).item()
+        predicted_emotion = emotions[predicted_emotion_id]
+        
+        # Get the confidence score for the predicted emotion
+        confidence_score = probabilities[0][predicted_emotion_id].item()
+        
+        #print highest confidence emotion and how confident
+        print(f"Predicted Emotion: {predicted_emotion.upper()}")
+        print(f"Confidence: {confidence_score:.4f} ({confidence_score*100:.2f}%)")
+        
+        # Show top 5 most likely emotions
+        top3_indices = torch.topk(probabilities, 3).indices[0]
+        top3_probs = torch.topk(probabilities, 3).values[0]
+        
+        print(f"\n Top 3 Emotions")
+        for rank in range(3):
+        # Get the emotion ID and convert tensor to regular Python int
+            emotion_id = top3_indices[rank].item()
     
-    # Convert string emotion labels to numeric IDs 
-    tokens['labels'] = [emotion_to_id[emotion] for emotion in batch['emotion']]
+            # Get the probability and convert tensor to regular Python float  
+            probability = top3_probs[rank].item()
     
-    return tokens
+            # Look up the actual emotion name using the ID
+            emotion_name = emotions[emotion_id]
+    
+            # Print with formatting
+            rank_number = rank + 1  # Start counting from 1, not 0
+            print(f"{rank_number}. {emotion_name:12} {probability:.3f} ({probability*100:.1f}%)")
+        
+        # Categorize emotions for easier understanding
+        print(f"\n EMOTION CATEGORY ")
+        emotion_categories = {
+            'positive': ['caring', 'confident', 'content', 'excited', 'faithful', 'grateful', 
+                        'hopeful', 'impressed', 'joyful', 'nostalgic', 'prepared', 'proud', 
+                        'sentimental', 'surprised', 'trusting'],
+            'negative': ['afraid', 'angry', 'annoyed', 'anxious', 'apprehensive', 'ashamed', 
+                        'devastated', 'disappointed', 'disgusted', 'embarrassed', 'furious', 
+                        'guilty', 'jealous', 'lonely', 'sad', 'terrified'],
+            'neutral': ['anticipating']
+        }
+        
+        category = 'unknown'
+        for cat, emotion_list in emotion_categories.items():
+            if predicted_emotion in emotion_list:
+                category = cat
+                break
+        
+        print(f"Emoption Category: {category.upper()}")
+        
+        return {
+            'transcribed_text': transcribed_text,
+            'predicted_emotion': predicted_emotion,
+            'predicted_emotion_id': predicted_emotion_id,
+            'confidence': confidence_score,
+            'category': category,
+            'top3_emotions': [(emotions[idx.item()], prob.item()) for idx, prob in zip(top3_indices, top3_probs)],
+            'probabilities': probabilities,
+            'logits': logits
+        }
+    else:
+        print("No text was transcribed from the audio or transcription failed")
+        return None
 
-
-
-#tokenize dataset
-tokenized_ed = ds_ed.map(roberta_tokenization, batched = True)
-tokenized_ed.set_format(type='torch', columns=['input_ids', 'attention_mask', 'labels']) #format data
-#print(tokenized_ed)
-training_dataset_ed = tokenized_ed['train']
-test_dataset_ed = tokenized_ed['test']
-valid_dataset_ed = tokenized_ed['valid']
-
-
-# print(ds_ed)
-# print(ds_ed['train'][0])
-
-train_dataloader_ed = DataLoader(training_dataset_ed, shuffle = True, batch_size = 8)
-valid_dataloader_ed = DataLoader(valid_dataset_ed, batch_size = 8)
-
-# -------------------------- Fine tune the roberta model -----------------------------
-
-from transformers import Trainer, TrainingArguments
-from torch.optim import AdamW
-
-
-#load pretrained model 
-
-analysis_model = AutoModelForSequenceClassification.from_pretrained("roberta-base", num_labels = len(emotions))
-
-training_arguments = TrainingArguments(
-    output_dir = "./roberta_results",
-    eval_strategy = "epoch",
-    learning_rate = 2e-5,
-    per_device_train_batch_size = 8,
-    per_device_eval_batch_size = 8,
-    num_train_epochs = 3,
-    weight_decay = 0.01
-)
-
-trainer = Trainer(
-    model = analysis_model,
-    args = training_arguments,
-    train_dataset = training_dataset_ed,
-    eval_dataset = valid_dataset_ed,
-)
-
-trainer.train()
-
-metrics = trainer.evaluate()
-print(metrics)
-
-predictions = trainer.predict(valid_dataset_ed)
-print(predictions)
-
-analysis_model.save_pretrained('./my-finetuned-model')
-roberta_tokenizer.save_pretrained('./my-finetuned-model')
-
-
-# -------------------------------- downloading the fine-tuned model ---------------------
-import shutil
-import os
-
-# Create a zip file of trained model
-zip_filename = 'my-finetuned-model'
-shutil.make_archive(zip_filename, 'zip', './my-finetuned-model')
-
-print(f"Model saved and zipped as: {zip_filename}.zip")
-print(f"Full path: {os.path.abspath(zip_filename + '.zip')}")
+# Run the analysis
+if __name__ == "__main__":
+    result = analyze_spoken_text()
