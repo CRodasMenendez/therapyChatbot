@@ -7,3 +7,5 @@ __pycache__/
 .DS_Store
 *.safetensors
 my-finetuned-model/
+
+my-finetuned-language-model/
