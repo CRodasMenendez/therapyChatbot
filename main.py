@@ -9,8 +9,8 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 emotion_tokenizer = AutoTokenizer.from_pretrained("./my-finetuned-model")
 emotion_model = AutoModelForSequenceClassification.from_pretrained("./my-finetuned-model")
 
-response_tokenizer = GPT2Tokenizer.from_pretrained("./my-finetuned-language-model")
-response_model = GPT2LMHeadModel.from_pretrained("./my-finetuned-language-model")
+response_tokenizer = GPT2Tokenizer.from_pretrained("./my-updated-finetuned-language-model")
+response_model = GPT2LMHeadModel.from_pretrained("./my-updated-finetuned-language-model")
 response_tokenizer.pad_token = response_tokenizer.eos_token
 
 
@@ -111,90 +111,8 @@ def analyze_spoken_text():
     
     
 # --------------------------- Functions to actually run the therapy session ----------------------------    
-    
-    
-#function to analyze emotion using finetuned RoBERTa Model
-def analyze_emotion(text):
-    inputs = emotion_tokenizer(text, return_tensors="pt", truncation=True, padding=True)
-    with torch.no_grad():
-        outputs = emotion_model(**inputs)
-        predictions = torch.nn.functional.softmax(outputs.logits, dim=-1)
-        
-    #get top emotion prediction
-    emotion_id = torch.argmax(predictions, dim=-1).item()
-    confidence = torch.max(predictions).item()
-    emotion = emotions[emotion_id]
-        
-    return emotion, confidence
 
 
-#function to generate response from language model
-def generate_response(user_input, detected_emotion=None, confidence=0.0):
-    #create prompt based off of emotion
-    if detected_emotion and confidence > 0.6:
-        #add emotion context to the prompt
-        emotion_context = f"Emotion: {detected_emotion}\n"
-        therapeutic_starter = response_strategies.get(detected_emotion, "")
-            
-        if therapeutic_starter:
-            prompt = f"{emotion_context}User: {user_input}\nTherapist: {therapeutic_starter}"
-        else:
-            prompt = f"{emotion_context}User: {user_input}\nTherapist:"
-    else:
-        #standard prompt without emotion context
-        prompt = f"User: {user_input}\nTherapist:"
-        
-    #tokenize and generate
-    inputs = response_tokenizer(prompt, return_tensors="pt", padding=True, truncation=True)
-    inputs = {k: v.to(response_model.device) for k, v in inputs.items()}
-        
-    with torch.no_grad():
-        outputs = response_model.generate(
-            **inputs,
-            max_length=inputs['input_ids'].shape[1] + 120,
-            temperature=0.7,
-            top_p=0.9,
-            do_sample=True,
-            pad_token_id=response_tokenizer.eos_token_id,
-            no_repeat_ngram_size=2
-        )
-        
-    # Decode response
-    generated_text = response_tokenizer.decode(outputs[0], skip_special_tokens=True)
-    response = generated_text[len(prompt):].strip()
-        
-    # Clean up response
-    if response:
-        for ending in ['. ', '! ', '? ']:
-            if ending in response:
-                end_idx = response.find(ending) + 1
-                response = response[:end_idx]
-                break
-        
-    return response if response else "I'm here to listen. Can you tell me more about what you're experiencing?"
-    
-    
-    
-def therapy():
-    #get transcribed text from the stt module 
-    transcribed_text = transcribe()
-    
-    #check if transcription was successful
-    if transcribed_text and transcribed_text.strip():
-        print(f"Input: '{transcribed_text}'")
-        
-        #analyze sentiment of input
-        emotion,confidence = analyze_emotion(transcribed_text)
-        response = generate_response(transcribed_text, emotion, confidence)
-        
-        return {
-            'detected_emotion': emotion,
-            'confidence': confidence,
-            'response': response,
-            'used_emotion_context': confidence > 0.6
-        }
-        
-        
 #define the emotion labels model was trained on 
 emotions = [
     'afraid', 'angry', 'annoyed', 'anticipating', 'anxious', 'apprehensive', 
@@ -221,13 +139,187 @@ response_strategies = {
     'confident': "I can hear the confidence in your voice. That's great to see. What's helping you feel so sure of yourself?",
     'disappointed': "Disappointment can be really hard to process. It sounds like something didn't go the way you hoped. What's been most disappointing for you?",
     'devastated': "That sounds absolutely overwhelming. I can only imagine how difficult this must be for you. Do you want to tell me more about what's making you feel this way?"
-}        
+}   
+
+#conversation memory
+
+conversation_history = []
+recent_emotions = []
+session_topics = []
+
+def add_to_memory(input, emotion, response):
+    conversation_history.append({
+        'user' : input,
+        'emotion' : emotion,
+        'response' : response
+    })
+    
+    #only keep the last 5 emotions for context
+    recent_emotions.append(emotion)
+    if len(recent_emotions) > 5:
+        recent_emotions.pop(0)
+    
+    #keyword detection for topics
+    keywords = ['work', 'boss', 'job', 'family', 'relationship', 'anxiety', 'depression', 'stress']
+    for keyword in keywords:
+        if keyword.lower() in input.lower():
+            if keyword not in session_topics:
+                session_topics.append(keyword)
+                
+
+def get_conversation_context():
+    if not conversation_history:
+        return ""
+    
+    #get recent topics and emotions
+    topics_str = ", ".join(session_topics[-3:]) if session_topics else "general"
+    emotions_str = ", ".join(recent_emotions[-2:]) if len(recent_emotions) > 1 else ""
+    
+    context = f"Previous topics: {topics_str}. "
+    if emotions_str:
+        context += f"Recent emotions: {emotions_str}. "
+    
+    return context
+    
+        
+    
+    
+    
+#function to analyze emotion using finetuned RoBERTa Model
+def analyze_emotion(text):
+    inputs = emotion_tokenizer(text, return_tensors="pt", truncation=True, padding=True)
+    with torch.no_grad():
+        outputs = emotion_model(**inputs)
+        predictions = torch.nn.functional.softmax(outputs.logits, dim=-1)
+        
+    #get top emotion prediction
+    top3_indices = torch.topk(predictions, 3).indices[0]
+    top3_probs = torch.topk(predictions, 3).values[0]
+    
+    conversational_responses = ['content', 'confident', 'prepared', 'trusting'] #filter out emotions that are just conversational
+    
+    emotion_id = top3_indices[0].item()
+    confidence = top3_probs[0].item()
+    emotion = emotions[emotion_id]
+    
+    #check second prediction if analyzed sentiment is just conversation with high confidence
+    if emotion in conversational_responses and confidence > 0.8 and len(text.split()) > 15 and len(top3_indices) > 1:
+        second_emotion = emotions[top3_indices[1].item()]
+        second_confidence = top3_probs[1].item()
+        
+        if second_confidence > 0.3:
+            emotion = second_emotion
+            confidence = second_confidence
+        
+    return emotion, confidence
+
+
+#function to generate response from language model
+def generate_response(user_input, detected_emotion=None, confidence=0.0):
+    #create response based off of emotion
+    
+    context = get_conversation_context()
+    
+    
+    if detected_emotion and confidence > 0.6:
+        therapeutic_starter = response_strategies.get(detected_emotion, "")
+        
+        if therapeutic_starter:
+            prompt = f"Context: {context}User: {user_input}\nTherapist: {therapeutic_starter}"
+        else:
+            prompt = f"Context: {context}Emotion: {detected_emotion}\nUser: {user_input}\nTherapist:"
+    else:
+        prompt = f"Context: {context}User: {user_input}\nTherapist: I hear what you're saying."
+    
+        
+    #tokenize and generate
+    inputs = response_tokenizer(prompt, return_tensors="pt", padding=True, truncation=True)
+    inputs = {k: v.to(response_model.device) for k, v in inputs.items()}
+        
+    with torch.no_grad():
+        outputs = response_model.generate(
+            **inputs,
+            max_length=inputs['input_ids'].shape[1] + 120,
+            temperature=0.6,
+            top_p=0.85,
+            do_sample=True,
+            pad_token_id=response_tokenizer.eos_token_id,
+            no_repeat_ngram_size=2,
+            repetition_penalty = 1.1
+        )
+        
+    #decode response
+    generated_text = response_tokenizer.decode(outputs[0], skip_special_tokens=True)
+    response = generated_text[len(prompt):].strip()
+        
+    #clean up response
+    if response:
+        #remove context that may have leaked through
+        if response.startswith("Context:"):
+            response = response.split("Therapist:")[-1].strip()
+            
+        #find natural ending
+        sentences = []
+        current_sentence = ""
+        
+        for char in response:
+            current_sentence += char
+            if char in '.!?':
+                sentences.append(current_sentence.strip())
+                current_sentence = ""
+                
+        if sentences:
+            if len(sentences) == 1:
+                response = sentences[0]
+            else:
+                #if first sentence is very short, include second
+                if len(sentences[0].split()) < 8 and len(sentences) > 1:
+                    response = sentences[0] + " " + sentences[1]
+                else:
+                    response = sentences[0]
+        
+        #fallback cleaning
+        if not response.endswith(('.', '!', '?')):
+            last_punct = max(response.rfind('.'), response.rfind('!'), response.rfind('?'))
+            if last_punct > 0:
+                response = response[:last_punct + 1]
+        
+    return response if response else "I'm here to listen. Can you tell me more about what you're experiencing?"
+    
+    
+    
+def therapy():
+    #get transcribed text from the stt module 
+    transcribed_text = transcribe()
+    
+    #check if transcription was successful
+    if transcribed_text and transcribed_text.strip():
+        print(f"Input: '{transcribed_text}'")
+        
+        #analyze sentiment of input
+        emotion,confidence = analyze_emotion(transcribed_text)
+        response = generate_response(transcribed_text, emotion, confidence)
+        
+        add_to_memory(transcribed_text,emotion, response)
+        
+        return {
+            'detected_emotion': emotion,
+            'confidence': confidence,
+            'response': response,
+            'used_emotion_context': confidence > 0.6
+        }
+    else:
+        print("No input detected, please try again \n")
+        return None
+        
         
     
         
         
     
     
+
+
 
 #run the analysis
 if __name__ == "__main__":

@@ -23,117 +23,39 @@ random.seed(42)
 np.random.seed(42)
 torch.manual_seed(42)
 
-#load datasets
-ds_ed = load_dataset("Estwld/empathetic_dialogues_llm")
-ds_counsel_chat = load_dataset("nbertagnolli/counsel-chat")
+#load dataset
+ds_mental_chat = load_dataset("ShenLab/MentalChat16K")
 
-print(f"EmpatheticDialogues: {len(ds_ed['train'])} conversations")
-print(f"Counsel Chat: {len(ds_counsel_chat['train'])} conversations")
+print(f"MentalChat16K: {len(ds_mental_chat['train'])} conversations")
 
-#------------------- process empathetic dialogues dataset -----------------------------
-empathetic_conversations = []
-max_empathetic = 5000  #limit to 5000 for faster training
+#------------------- process MentalChat16K dataset -----------------------------
+mental_chat_conversations = []
+max_mental_chat = 10000  #limit to 10000 for faster training
 
-for example in tqdm(ds_ed['train'], desc="Processing Empathetic Dialogues"):
-    if len(empathetic_conversations) >= max_empathetic:
+for example in tqdm(ds_mental_chat['train'], desc="Processing MentalChat16K"):
+    if len(mental_chat_conversations) >= max_mental_chat:
         break
     
-    #conversation metadata
-    conv_id = example['conv_id']
-    situation = example.get('situation', '')
-    emotion = example.get('emotion', '')
-    conversations = example.get('conversations', [])
+    #extract user and therapist content
+    user_input = example.get('input', '').strip()
+    response = example.get('output', '').strip()
     
-    #skip if no conversations
-    if not conversations:
+    #skip if no user input or response
+    if not user_input or not response:
         continue
     
-    #build conversation text with context
-    conversation_text = ""
-    
-    #add 'context'
-    if situation:
-        conversation_text += f"Context: {situation}\n"
-    if emotion:
-        conversation_text += f"Emotion: {emotion}\n"
-    
-    #process each turn in the conversation
-    for turn in conversations:
-        role = turn.get('role', 'unknown')
-        content = turn.get('content', '').strip()
-        
-        if content:
-            conversation_text += f"{role}: {content}\n"
-    
-    #add end-of-text token
-    conversation_text += "<|endoftext|>"
-    
-    #only add substantial conversations (more than 10 words)
-    if len(conversation_text.split()) > 10:
-        empathetic_conversations.append(conversation_text)
-
-print(f"Processed {len(empathetic_conversations)} Empathetic Dialogues conversations")
-
-#process counsel chat dataset
-counsel_conversations = []
-max_counsel = 2000 
-
-for i, example in enumerate(tqdm(ds_counsel_chat['train'], desc="Processing Counsel Chat")):
-    if i >= max_counsel:
-        break
-    
-    #extract question and answer fields 
-    question_title = example.get('questionTitle', '')
-    question_title = question_title.strip() if question_title else ''
-    
-    question_text = example.get('questionText', '')
-    question_text = question_text.strip() if question_text else ''
-    
-    answer_text = example.get('answerText', '')
-    answer_text = answer_text.strip() if answer_text else ''
-    
-    topic = example.get('topic', '')
-    topic = topic.strip() if topic else ''
-    
     #build conversation text
-    conversation_text = ""
+    conversation_text = f"User: {user_input}\nTherapist: {response}\n<|endoftext|>"
     
-    #add topic context if available
-    if topic:
-        conversation_text += f"Topic: {topic}\n"
-    
-    #combine question title and text for user input
-    user_input = ""
-    if question_title and question_text:
-        user_input = f"{question_title} - {question_text}"
-    elif question_text:
-        user_input = question_text
-    elif question_title:
-        user_input = question_title
-    
-    if user_input:
-        conversation_text += f"User: {user_input}\n"
-    
-    #add therapist response
-    if answer_text:
-        conversation_text += f"Therapist: {answer_text}\n"
-    
-    #add end-of-text token
-    conversation_text += "<|endoftext|>"
-    
-    #only add substantial conversations (more than 20 words for Q&A format)
+    #only add substantial conversations (more than 20 words)
     if len(conversation_text.split()) > 20:
-        counsel_conversations.append(conversation_text)
+        mental_chat_conversations.append(conversation_text)
 
-print(f"Processed {len(counsel_conversations)} Counsel Chat conversations")
-
-#combine all conversations for training
-all_conversations = empathetic_conversations + counsel_conversations
-print(f"\nTotal conversations for training: {len(all_conversations)}")
+print(f"Processed {len(mental_chat_conversations)} MentalChat16K conversations")
 
 #split data into training and validation sets
 train_texts, val_texts = train_test_split(
-    all_conversations, 
+    mental_chat_conversations, 
     test_size=0.1,  # 10% for validation
     random_state=42
 )
@@ -142,7 +64,6 @@ print(f"Training conversations: {len(train_texts)}")
 print(f"Validation conversations: {len(val_texts)}")
 
 #initialize GPT-2 model and tokenizer
-print("\nInitializing model and tokenizer...")
 model_name = "gpt2" #gpt-2 base model
 tokenizer = GPT2Tokenizer.from_pretrained(model_name)
 model = GPT2LMHeadModel.from_pretrained(model_name)
@@ -163,13 +84,11 @@ def tokenize_function(examples):
     tokens["labels"] = tokens["input_ids"].clone()
     return tokens
 
-print("Tokenizing datasets...")
-
 #convert text to tokens
 train_encodings = tokenize_function(train_texts)
 val_encodings = tokenize_function(val_texts)
 
-#create pytorch datasets
+#create pytorch dataset
 class ConversationDataset(torch.utils.data.Dataset):
     def __init__(self, encodings):
         self.encodings = encodings
@@ -195,7 +114,7 @@ data_collator = DataCollatorForLanguageModeling(
 
 #training configuration 
 training_args = TrainingArguments(
-    output_dir="./my-finetuned-language-model", #where to save the model
+    output_dir="./my-updated-finetuned-language-model", #where to save the model
     overwrite_output_dir=True,                  #overwrite existing output
     num_train_epochs=4,                         #4 epochs 
     per_device_train_batch_size=2,              #2 for stability  
@@ -225,25 +144,22 @@ trainer = Trainer(
     tokenizer=tokenizer,            #tokenizer for text processing
 )
 
-print("\nStarting training...")
-print("Estimated training time: 3-4 hours")
-
 #error handling for overnight training
 try:
     #train the model
     trainer.train()
 
     #save the final model and tokenizer
-    trainer.save_model("./my-finetuned-language-model")
-    tokenizer.save_pretrained("./my-finetuned-language-model")
+    trainer.save_model("./my-updated-finetuned-language-model")
+    tokenizer.save_pretrained("./my-updated-finetuned-language-model")
     print("Training completed successfully!")
     
 except Exception as e:
     print(f"Training error: {e}")
     print("Saving current progress...")
     try:
-        trainer.save_model("./my-finetuned-language-model-backup")
-        tokenizer.save_pretrained("./my-finetuned-language-model-backup")
+        trainer.save_model("./my-updated-finetuned-language-model-backup")
+        tokenizer.save_pretrained("./my-updated-finetuned-language-model-backup")
         print("Backup saved!")
     except:
         print("Could not save backup")
