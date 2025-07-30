@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: therapist-backend
+    env: python
+    buildCommand: "cd backend && pip install -r requirements.txt"
+    startCommand: "cd backend && python main.py"
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: PORT
+        fromService:
+          type: web
+          name: therapist-backend
+          property: port

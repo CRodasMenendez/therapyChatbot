@@ -1,4 +1,4 @@
-# backend/main.py
+# backend/main.py - optimized for render deployment
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -8,9 +8,17 @@ import os
 from typing import Dict, List, Optional
 from datetime import datetime
 
-from emotion_analyzer import EmotionAnalyzer
-from response_generator import ResponseGenerator
-from audio_processor import AudioProcessor
+# import AI components with error handling for deployment
+try:
+    from emotion_analyzer import EmotionAnalyzer
+    from response_generator import ResponseGenerator
+    from audio_processor import AudioProcessor
+    print("loaded real AI components")
+except ImportError as e:
+    print(f"could not load AI components: {e}")
+    print("using mock components for deployment")
+    # you can add mock imports here if needed
+    raise
 
 app = FastAPI(title="AI Therapist API", version="1.0.0")
 
@@ -18,17 +26,21 @@ app = FastAPI(title="AI Therapist API", version="1.0.0")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 PORT = int(os.getenv("PORT", 8000))
 
+print(f"starting in {ENVIRONMENT} mode on port {PORT}")
+
 # configure CORS for both development and production
 if ENVIRONMENT == "production":
-    # in production, allow your deployed frontend domain
-    # you'll need to update this after deploying your frontend
+    # for render deployment - you'll update these URLs after deployment
     allowed_origins = [
-        "https://your-app-name.vercel.app",  # replace with your actual Vercel URL
-        "https://*.vercel.app",  # allow all Vercel preview deployments
+        "https://your-frontend-app.vercel.app",  # replace with your vercel URL
+        "https://*.vercel.app",  # allow vercel preview deployments
+        "https://therapist-frontend.onrender.com",  # if deploying frontend to render too
     ]
 else:
     # development origins
     allowed_origins = ["http://localhost:3000"]
+
+print(f"allowed CORS origins: {allowed_origins}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,16 +50,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# initialize AI components
-emotion_analyzer = EmotionAnalyzer()
-response_generator = ResponseGenerator()
-audio_processor = AudioProcessor()
+# initialize AI components with error handling
+try:
+    print("initializing AI components...")
+    emotion_analyzer = EmotionAnalyzer()
+    print("emotion analyzer loaded")
+    
+    response_generator = ResponseGenerator()
+    print("response generator loaded")
+    
+    audio_processor = AudioProcessor()
+    print("audio processor loaded")
+    
+    print("all AI components ready!")
+except Exception as e:
+    print(f"error initializing AI components: {e}")
+    raise
 
 # manage WebSocket connections and session data
 class ConnectionManager:
     def __init__(self):
         self.active_connections: List[WebSocket] = []
         self.sessions: Dict[str, dict] = {}
+        print("connection manager initialized")
 
     async def connect(self, websocket: WebSocket, session_id: str):
         await websocket.accept()
@@ -59,12 +84,14 @@ class ConnectionManager:
             "session_topics": [],
             "started_at": datetime.now().isoformat()
         }
+        print(f"new session connected: {session_id}")
 
     def disconnect(self, websocket: WebSocket, session_id: str):
         if websocket in self.active_connections:
             self.active_connections.remove(websocket)
         if session_id in self.sessions:
             del self.sessions[session_id]
+        print(f"session disconnected: {session_id}")
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         await websocket.send_text(message)
@@ -75,29 +102,38 @@ manager = ConnectionManager()
 async def health_check():
     return {
         "status": "healthy", 
-        "message": "AI Therapist API is running",
+        "message": "AI Therapist API is running on Render",
         "environment": ENVIRONMENT,
-        "port": PORT
+        "port": PORT,
+        "active_sessions": len(manager.sessions)
     }
 
 @app.get("/")
 async def root():
-    return {"message": "AI Therapist API", "docs": "/docs"}
+    return {
+        "message": "AI Therapist API - deployed on Render", 
+        "docs": "/docs",
+        "health": "/health"
+    }
 
 @app.post("/api/process-audio")
 async def process_audio(audio_file: UploadFile = File(...)):
     """process uploaded audio file and return transcription with emotion analysis"""
     try:
+        print(f"processing audio file: {audio_file.filename}")
         audio_data = await audio_file.read()
+        print(f"audio data size: {len(audio_data)} bytes")
         
         # transcribe audio using whisper
         transcription = audio_processor.transcribe_audio(audio_data)
+        print(f"transcription: {transcription[:100]}...")
         
         if not transcription or not transcription.strip():
             raise HTTPException(status_code=400, detail="No speech detected in audio")
         
         # analyze emotion using finetuned model
         emotion_result = emotion_analyzer.analyze_emotion(transcription)
+        print(f"detected emotion: {emotion_result['emotion']} ({emotion_result['confidence']:.2f})")
         
         return {
             "transcription": transcription,
@@ -108,6 +144,7 @@ async def process_audio(audio_file: UploadFile = File(...)):
         }
         
     except Exception as e:
+        print(f"error processing audio: {e}")
         raise HTTPException(status_code=500, detail=f"Error processing audio: {str(e)}")
 
 @app.post("/api/generate-response")
@@ -118,6 +155,8 @@ async def generate_response(request: dict):
         detected_emotion = request.get("emotion")
         confidence = request.get("confidence", 0.0)
         session_id = request.get("session_id")
+        
+        print(f"generating response for emotion: {detected_emotion}")
         
         if not user_input:
             raise HTTPException(status_code=400, detail="User input is required")
@@ -133,6 +172,8 @@ async def generate_response(request: dict):
             conversation_history=session_data.get("conversation_history", []),
             recent_emotions=session_data.get("recent_emotions", [])
         )
+        
+        print(f"generated response: {response[:100]}...")
         
         # update session conversation history
         if session_id and session_id in manager.sessions:
@@ -154,6 +195,7 @@ async def generate_response(request: dict):
         }
         
     except Exception as e:
+        print(f"error generating response: {e}")
         raise HTTPException(status_code=500, detail=f"Error generating response: {str(e)}")
 
 @app.get("/api/session/{session_id}")
@@ -185,6 +227,7 @@ async def websocket_therapy_session(websocket: WebSocket, session_id: str):
             
             if message_data["type"] == "audio_data":
                 try:
+                    print("processing websocket audio data")
                     # decode audio data from base64
                     audio_bytes = base64.b64decode(message_data["audio"])
                     
@@ -239,6 +282,7 @@ async def websocket_therapy_session(websocket: WebSocket, session_id: str):
                             manager.sessions[session_id]["recent_emotions"].pop(0)
                     
                 except Exception as e:
+                    print(f"websocket audio error: {e}")
                     error_response = {
                         "type": "error",
                         "content": f"Error processing audio: {str(e)}",
@@ -247,6 +291,7 @@ async def websocket_therapy_session(websocket: WebSocket, session_id: str):
                     await websocket.send_text(json.dumps(error_response))
             
             elif message_data["type"] == "text_message":
+                print("processing websocket text message")
                 # handle typed messages
                 user_input = message_data["content"]
                 
@@ -283,7 +328,14 @@ async def websocket_therapy_session(websocket: WebSocket, session_id: str):
                 
     except WebSocketDisconnect:
         manager.disconnect(websocket, session_id)
-        print(f"Client {session_id} disconnected")
+        print(f"websocket client {session_id} disconnected")
+
+# startup event
+@app.on_event("startup")
+async def startup_event():
+    print("AI Therapist API starting up on Render...")
+    print(f"environment: {ENVIRONMENT}")
+    print(f"port: {PORT}")
 
 if __name__ == "__main__":
     uvicorn.run(

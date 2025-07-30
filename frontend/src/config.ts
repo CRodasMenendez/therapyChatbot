@@ -4,8 +4,8 @@ const config = {
         WS_BASE: 'ws://localhost:8000'
     },
     production: {
-        API_BASE: 'https://your-backend-url.railway.app', // you'll update this after backend deployment
-        WS_BASE: 'wss://your-backend-url.railway.app'    // you'll update this after backend deployment
+        API_BASE: 'https://therapist-backend.onrender.com', // replace with actual render URL
+        WS_BASE: 'wss://therapist-backend.onrender.com'     // replace with actual render URL
     }
 };
 

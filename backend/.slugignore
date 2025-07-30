@@ -1,0 +1,7 @@
+# files to ignore during render deployment
+*.pyc
+__pycache__/
+.git/
+.DS_Store
+*.log
+.env
