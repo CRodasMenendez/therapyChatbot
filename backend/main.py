@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import json
 import base64
+import os
 from typing import Dict, List, Optional
 from datetime import datetime
 
@@ -13,10 +14,25 @@ from audio_processor import AudioProcessor
 
 app = FastAPI(title="AI Therapist API", version="1.0.0")
 
-# allow React frontend to connect to this backend API
+# get environment variables for production deployment
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+PORT = int(os.getenv("PORT", 8000))
+
+# configure CORS for both development and production
+if ENVIRONMENT == "production":
+    # in production, allow your deployed frontend domain
+    # you'll need to update this after deploying your frontend
+    allowed_origins = [
+        "https://your-app-name.vercel.app",  # replace with your actual Vercel URL
+        "https://*.vercel.app",  # allow all Vercel preview deployments
+    ]
+else:
+    # development origins
+    allowed_origins = ["http://localhost:3000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,7 +61,8 @@ class ConnectionManager:
         }
 
     def disconnect(self, websocket: WebSocket, session_id: str):
-        self.active_connections.remove(websocket)
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
         if session_id in self.sessions:
             del self.sessions[session_id]
 
@@ -56,7 +73,16 @@ manager = ConnectionManager()
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "message": "AI Therapist API is running"}
+    return {
+        "status": "healthy", 
+        "message": "AI Therapist API is running",
+        "environment": ENVIRONMENT,
+        "port": PORT
+    }
+
+@app.get("/")
+async def root():
+    return {"message": "AI Therapist API", "docs": "/docs"}
 
 @app.post("/api/process-audio")
 async def process_audio(audio_file: UploadFile = File(...)):
@@ -263,7 +289,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
-        port=8000,
-        reload=True,
+        port=PORT,
+        reload=ENVIRONMENT == "development",
         log_level="info"
     )

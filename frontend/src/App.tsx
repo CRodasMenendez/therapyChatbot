@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { TherapySession } from './components/TherapySession';
 
-const API_BASE = 'http://localhost:8000';
+import config from './config';
+const API_BASE = config.API_BASE;
 
 // Function to check if the backend API is healthy and responsive
 const checkHealth = async (): Promise<boolean> => {

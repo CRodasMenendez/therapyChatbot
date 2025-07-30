@@ -1,4 +1,5 @@
 // src/components/TherapySession.tsx
+import config from '../config';
 import React, { useState, useEffect, useRef } from 'react';
 import { AudioRecorder } from './AudioRecorder';
 
@@ -62,7 +63,7 @@ export const TherapySession: React.FC<TherapySessionProps> = ({
         setWsStatus('connecting');
 
         try {
-            const ws = new WebSocket(`ws://localhost:8000/ws/therapy/${sessionId}`);
+            const ws = new WebSocket(`${config.WS_BASE}/ws/therapy/${sessionId}`);
             wsRef.current = ws;
 
             ws.onopen = () => {
