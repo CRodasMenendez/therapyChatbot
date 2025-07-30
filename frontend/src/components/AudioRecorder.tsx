@@ -21,14 +21,12 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const chunksRef = useRef<Blob[]>([]);
 
-    // start the recording timer
     const startTimer = () => {
         timerRef.current = setInterval(() => {
             setRecordingTime(prev => prev + 1);
         }, 1000);
     };
 
-    // stop the recording timer
     const stopTimer = () => {
         if (timerRef.current) {
             clearInterval(timerRef.current);
@@ -36,13 +34,11 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
         }
     };
 
-    // reset the recording timer
     const resetTimer = () => {
         stopTimer();
         setRecordingTime(0);
     };
 
-    // start recording audio
     const startRecording = async () => {
         try {
             setError(null);
@@ -112,7 +108,6 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
         }
     };
 
-    // stop recording audio
     const stopRecording = () => {
         if (mediaRecorderRef.current && isRecording) {
             mediaRecorderRef.current.stop();
@@ -122,7 +117,6 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
         }
     };
 
-    // pause recording audio
     const pauseRecording = () => {
         if (mediaRecorderRef.current && isRecording && !isPaused) {
             mediaRecorderRef.current.pause();
@@ -131,7 +125,6 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
         }
     };
 
-    // resume recording audio
     const resumeRecording = () => {
         if (mediaRecorderRef.current && isRecording && isPaused) {
             mediaRecorderRef.current.resume();
@@ -140,7 +133,6 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
         }
     };
 
-    // clear current recording
     const clearRecording = () => {
         setAudioBlob(null);
         setError(null);
@@ -152,7 +144,6 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
         }
     };
 
-    // submit the recorded audio
     const handleSubmit = () => {
         if (audioBlob) {
             onAudioSubmit(audioBlob);
@@ -160,7 +151,6 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
         }
     };
 
-    // format recording time for display
     const formatRecordingTime = (seconds: number): string => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
@@ -168,177 +158,230 @@ export const AudioRecorder: React.FC<AudioRecorderProps> = ({
     };
 
     return (
-        <div style={{ textAlign: 'center' }}>
-            {/* error display */}
-            {error && (
-                <div style={{
-                    padding: '0.75rem',
-                    backgroundColor: '#fee2e2',
-                    border: '1px solid #fecaca',
-                    borderRadius: '0.5rem',
-                    marginBottom: '1rem'
-                }}>
-                    <p style={{ color: '#dc2626', fontSize: '0.875rem', margin: 0 }}>{error}</p>
-                </div>
-            )}
-
-            {/* main recording controls */}
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '1rem',
-                marginBottom: '1rem'
-            }}>
-                {/* record/stop button */}
-                {!isRecording ? (
-                    <button
-                        onClick={startRecording}
-                        disabled={disabled}
-                        style={{
-                            width: '4rem',
-                            height: '4rem',
-                            backgroundColor: disabled ? '#9ca3af' : '#4f46e5',
-                            color: 'white',
-                            borderRadius: '50%',
-                            border: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: disabled ? 'not-allowed' : 'pointer',
-                            fontSize: '1.5rem'
-                        }}
-                    >
-                        🎤
-                    </button>
-                ) : (
-                    <button
-                        onClick={stopRecording}
-                        style={{
-                            width: '4rem',
-                            height: '4rem',
-                            backgroundColor: '#dc2626',
-                            color: 'white',
-                            borderRadius: '50%',
-                            border: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            fontSize: '1.5rem'
-                        }}
-                    >
-                        ⏹️
-                    </button>
-                )}
-
-                {/* pause/resume button */}
-                {isRecording && (
-                    <button
-                        onClick={isPaused ? resumeRecording : pauseRecording}
-                        style={{
-                            width: '3rem',
-                            height: '3rem',
-                            backgroundColor: '#06b6d4',
-                            color: 'white',
-                            borderRadius: '50%',
-                            border: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            fontSize: '1rem'
-                        }}
-                    >
-                        {isPaused ? '▶️' : '⏸️'}
-                    </button>
-                )}
-            </div>
-
-            {/* recording timer */}
-            {isRecording && (
-                <div style={{ marginBottom: '1rem' }}>
+        <>
+            <div style={{ textAlign: 'center' }}>
+                {/* error display */}
+                {error && (
                     <div style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        backgroundColor: '#f8fafc',
-                        padding: '0.5rem 1rem',
-                        borderRadius: '0.5rem'
+                        padding: '1rem',
+                        background: 'rgba(244, 67, 54, 0.2)',
+                        border: '1px solid rgba(244, 67, 54, 0.3)',
+                        borderRadius: '15px',
+                        marginBottom: '1.5rem',
+                        backdropFilter: 'blur(10px)'
                     }}>
-                        <div style={{
-                            width: '0.5rem',
-                            height: '0.5rem',
-                            backgroundColor: '#dc2626',
-                            borderRadius: '50%'
-                        }}></div>
-                        <span style={{ fontFamily: 'monospace', color: '#1e293b' }}>
-                            {formatRecordingTime(recordingTime)}
-                        </span>
-                        {isPaused && (
-                            <span style={{ color: '#d97706', fontSize: '0.875rem' }}>(Paused)</span>
-                        )}
+                        <p style={{ color: 'rgba(255, 255, 255, 0.9)', fontSize: '0.9rem', margin: 0 }}>
+                            ⚠ {error}
+                        </p>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* playback and submit controls */}
-            {audioBlob && !isRecording && (
+                {/* main recording controls */}
                 <div style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: '1rem',
-                    marginBottom: '1rem'
+                    gap: '1.5rem',
+                    marginBottom: '1.5rem'
                 }}>
-                    <button
-                        onClick={clearRecording}
-                        style={{
-                            width: '2.5rem',
-                            height: '2.5rem',
-                            backgroundColor: '#6b7280',
-                            color: 'white',
-                            borderRadius: '50%',
-                            border: 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            fontSize: '1rem'
-                        }}
-                    >
-                        🗑️
-                    </button>
+                    {/* record/stop button */}
+                    {!isRecording ? (
+                        <button
+                            onClick={startRecording}
+                            disabled={disabled}
+                            style={{
+                                width: '80px',
+                                height: '80px',
+                                background: disabled
+                                    ? 'rgba(255, 255, 255, 0.2)'
+                                    : 'linear-gradient(45deg, #FF6B6B, #4ECDC4)',
+                                color: 'white',
+                                borderRadius: '50%',
+                                border: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: disabled ? 'not-allowed' : 'pointer',
+                                fontSize: '1.5rem',
+                                transition: 'all 0.3s ease',
+                                boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                                backdropFilter: 'blur(10px)',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            MIC
+                        </button>
+                    ) : (
+                        <button
+                            onClick={stopRecording}
+                            style={{
+                                width: '80px',
+                                height: '80px',
+                                background: 'linear-gradient(45deg, #f44336, #d32f2f)',
+                                color: 'white',
+                                borderRadius: '50%',
+                                border: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                fontSize: '1.2rem',
+                                transition: 'all 0.3s ease',
+                                boxShadow: '0 0 0 0 rgba(244, 67, 54, 0.7)',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            STOP
+                        </button>
+                    )}
 
-                    <button
-                        onClick={handleSubmit}
-                        style={{
-                            padding: '0.75rem 1.5rem',
-                            backgroundColor: '#10b981',
-                            color: 'white',
-                            borderRadius: '0.5rem',
-                            border: 'none',
-                            fontWeight: '500',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        📤 Send Recording
-                    </button>
+                    {/* pause/resume button */}
+                    {isRecording && (
+                        <button
+                            onClick={isPaused ? resumeRecording : pauseRecording}
+                            style={{
+                                width: '60px',
+                                height: '60px',
+                                background: 'linear-gradient(45deg, #2196F3, #1976D2)',
+                                color: 'white',
+                                borderRadius: '50%',
+                                border: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                fontSize: '0.8rem',
+                                transition: 'all 0.3s ease',
+                                boxShadow: '0 8px 20px rgba(33, 150, 243, 0.3)',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            {isPaused ? 'PLAY' : 'PAUSE'}
+                        </button>
+                    )}
                 </div>
-            )}
 
-            {/* instructions for user */}
-            <div style={{ color: '#64748b', fontSize: '0.875rem' }}>
-                {!isRecording && !audioBlob && (
-                    <p>Click the microphone to start recording your message</p>
-                )}
+                {/* recording timer */}
                 {isRecording && (
-                    <p>Click the square to stop recording, or pause to take a break</p>
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <div style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.75rem',
+                            background: 'rgba(255, 255, 255, 0.2)',
+                            backdropFilter: 'blur(10px)',
+                            padding: '1rem 1.5rem',
+                            borderRadius: '25px',
+                            border: '1px solid rgba(255, 255, 255, 0.3)'
+                        }}>
+                            <div style={{
+                                width: '12px',
+                                height: '12px',
+                                backgroundColor: '#f44336',
+                                borderRadius: '50%'
+                            }}></div>
+                            <span style={{
+                                fontFamily: 'monospace',
+                                color: 'white',
+                                fontSize: '1.1rem',
+                                fontWeight: '600'
+                            }}>
+                                {formatRecordingTime(recordingTime)}
+                            </span>
+                            {isPaused && (
+                                <span style={{
+                                    color: 'rgba(255, 255, 255, 0.8)',
+                                    fontSize: '0.9rem',
+                                    fontStyle: 'italic'
+                                }}>
+                                    (Paused)
+                                </span>
+                            )}
+                        </div>
+                    </div>
                 )}
+
+                {/* playback and submit controls */}
                 {audioBlob && !isRecording && (
-                    <p>Review your recording and click "Send Recording" to submit</p>
+                    <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '1rem',
+                        marginBottom: '1rem'
+                    }}>
+                        <button
+                            onClick={clearRecording}
+                            style={{
+                                width: '50px',
+                                height: '50px',
+                                background: 'linear-gradient(45deg, #9E9E9E, #757575)',
+                                color: 'white',
+                                borderRadius: '50%',
+                                border: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                fontSize: '0.7rem',
+                                transition: 'all 0.3s ease',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            DELETE
+                        </button>
+
+                        <button
+                            onClick={handleSubmit}
+                            style={{
+                                padding: '1rem 2rem',
+                                background: 'linear-gradient(45deg, #4CAF50, #45a049)',
+                                color: 'white',
+                                borderRadius: '25px',
+                                border: 'none',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                fontSize: '1rem',
+                                transition: 'all 0.3s ease',
+                                boxShadow: '0 8px 20px rgba(76, 175, 80, 0.3)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                            }}
+                        >
+                            Send Recording
+                        </button>
+                    </div>
                 )}
+
+                {/* instructions */}
+                <div style={{
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    fontSize: '0.9rem',
+                    lineHeight: '1.5'
+                }}>
+                    {!isRecording && !audioBlob && (
+                        <p style={{ margin: 0 }}>
+                            Click the microphone to start recording your message
+                        </p>
+                    )}
+                    {isRecording && (
+                        <p style={{ margin: 0 }}>
+                            Recording in progress... Click STOP to finish or PAUSE to take a break
+                        </p>
+                    )}
+                    {audioBlob && !isRecording && (
+                        <div>
+                            <p style={{ margin: '0 0 0.5rem 0' }}>
+                                Recording complete!
+                            </p>
+                            <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.8 }}>
+                                Review and click "Send Recording" to submit, or DELETE to clear
+                            </p>
+                        </div>
+                    )}
+                </div>
             </div>
-        </div>
+        </>
     );
 };
