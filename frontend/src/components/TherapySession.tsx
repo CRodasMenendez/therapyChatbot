@@ -3,6 +3,7 @@ import config from '../config';
 import React, { useState, useEffect, useRef } from 'react';
 import { AudioRecorder } from './AudioRecorder';
 
+
 interface TherapySessionProps {
     sessionId: string;
     isConnected: boolean;

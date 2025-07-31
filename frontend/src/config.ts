@@ -4,8 +4,8 @@ const config = {
         WS_BASE: 'ws://localhost:8000'
     },
     production: {
-        API_BASE: 'https://therapist-backend.onrender.com', // replace with actual render URL
-        WS_BASE: 'wss://therapist-backend.onrender.com'     // replace with actual render URL
+        API_BASE: 'https://therapist-backend-223632250356.us-central1.run.app', 
+        WS_BASE: 'https://therapist-backend-223632250356.us-central1.run.app'    
     }
 };
 

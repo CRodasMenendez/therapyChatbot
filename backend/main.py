@@ -24,7 +24,7 @@ app = FastAPI(title="AI Therapist API", version="1.0.0")
 
 # get environment variables for production deployment
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-PORT = int(os.getenv("PORT", 8000))
+PORT = int(os.getenv("PORT", 8080))
 
 print(f"starting in {ENVIRONMENT} mode on port {PORT}")
 
