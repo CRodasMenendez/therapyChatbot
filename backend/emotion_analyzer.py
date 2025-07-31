@@ -5,8 +5,10 @@ import torch.nn.functional as F
 import os
 
 class EmotionAnalyzer:
-    def __init__(self, model_path="./my-finetuned-model"):
+    def __init__(self):
         os.environ["TOKENIZERS_PARALLELISM"] = "false"
+        
+        model_path = "CRodas/therapist-emotion-model"
         
         self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         self.model = AutoModelForSequenceClassification.from_pretrained(model_path)

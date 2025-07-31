@@ -4,7 +4,9 @@ import torch
 from typing import List, Dict, Optional
 
 class ResponseGenerator:
-    def __init__(self, model_path="./my-updated-finetuned-language-model"):
+    def __init__(self):
+        
+        model_path = "CRodas/therapist-response-model"
         
         self.tokenizer = GPT2Tokenizer.from_pretrained(model_path)
         self.model = GPT2LMHeadModel.from_pretrained(model_path)
