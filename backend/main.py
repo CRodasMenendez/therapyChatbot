@@ -1,4 +1,4 @@
-# backend/main.py - optimized for render deployment
+# backend/main.py 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -30,7 +30,7 @@ print(f"starting in {ENVIRONMENT} mode on port {PORT}")
 
 # configure CORS for both development and production
 if ENVIRONMENT == "production":
-    # for render deployment - you'll update these URLs after deployment
+    # for gcp deployment - you'll update these URLs after deployment
     allowed_origins = [
         "https://therapy-chatbot-br85oaasf-cesars-projects-2a1ec814.vercel.app/",  # Vercel URL
         "https://*.vercel.app",  # allow vercel preview deployments
@@ -110,7 +110,7 @@ async def health_check():
 @app.get("/")
 async def root():
     return {
-        "message": "AI Therapist API - deployed on Render", 
+        "message": "AI Therapist API - deployed on GCP", 
         "docs": "/docs",
         "health": "/health"
     }
@@ -332,7 +332,7 @@ async def websocket_therapy_session(websocket: WebSocket, session_id: str):
 # startup event
 @app.on_event("startup")
 async def startup_event():
-    print("AI Therapist API starting up on Render...")
+    print("AI Therapist API starting up on GCP...")
     print(f"environment: {ENVIRONMENT}")
     print(f"port: {PORT}")
 
