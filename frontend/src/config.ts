@@ -5,7 +5,7 @@ const config = {
     },
     production: {
         API_BASE: 'https://therapist-backend-223632250356.us-east1.run.app', 
-        WS_BASE: 'https://therapist-backend-223632250356.us-east1.run.app'    
+        WS_BASE: 'wss://therapist-backend-223632250356.us-east1.run.app'    
     }
 };
 
