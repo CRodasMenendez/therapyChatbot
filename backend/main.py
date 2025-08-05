@@ -32,9 +32,8 @@ print(f"starting in {ENVIRONMENT} mode on port {PORT}")
 if ENVIRONMENT == "production":
     # for render deployment - you'll update these URLs after deployment
     allowed_origins = [
-        "https://your-frontend-app.vercel.app",  # replace with your vercel URL
+        "https://therapy-chatbot-br85oaasf-cesars-projects-2a1ec814.vercel.app/",  # Vercel URL
         "https://*.vercel.app",  # allow vercel preview deployments
-        "https://therapist-frontend.onrender.com",  # if deploying frontend to render too
     ]
 else:
     # development origins
@@ -102,7 +101,7 @@ manager = ConnectionManager()
 async def health_check():
     return {
         "status": "healthy", 
-        "message": "AI Therapist API is running on Render",
+        "message": "AI Therapist API is running on GCP",
         "environment": ENVIRONMENT,
         "port": PORT,
         "active_sessions": len(manager.sessions)
