@@ -30,9 +30,9 @@ print(f"starting in {ENVIRONMENT} mode on port {PORT}")
 
 # configure CORS for both development and production
 if ENVIRONMENT == "production":
-    # for gcp deployment - you'll update these URLs after deployment
+    # for gcp deployment
     allowed_origins = [
-        "https://therapy-chatbot-br85oaasf-cesars-projects-2a1ec814.vercel.app/",  # Vercel URL
+        "https://therapy-chatbot-wip.vercel.app",  # Vercel URL
         "https://*.vercel.app",  # allow vercel preview deployments
     ]
 else:
