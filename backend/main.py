@@ -34,6 +34,8 @@ if ENVIRONMENT == "production":
     allowed_origins = [
         "https://therapy-chatbot-wip.vercel.app",  # Vercel URL
         "https://*.vercel.app",  # allow vercel preview deployments
+        "https://therapychatbot.xyz", #custom domain
+        "https://www.therapychatbot.xyz" #www version of custom domain
     ]
 else:
     # development origins
